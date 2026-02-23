@@ -31,28 +31,34 @@ class ApwsQueryService
         return $this->repository->getSummary($filters);
     }
 
-    public function brands(array $filters, int $limit): array
+    public function brands(array $filters, int $limit, string $sortBy = 'campaigns', string $sortOrder = 'desc'): array
     {
-        return $this->repository->aggregateBrands($filters, $limit);
+        return $this->repository->aggregateBrands($filters, $limit, $sortBy, $sortOrder);
     }
 
-    public function products(array $filters, int $limit): array
+    public function products(array $filters, int $limit, string $sortBy = 'campaigns', string $sortOrder = 'desc'): array
     {
-        return $this->repository->aggregateProducts($filters, $limit);
+        return $this->repository->aggregateProducts($filters, $limit, $sortBy, $sortOrder);
     }
 
-    public function regions(array $filters, int $limit): array
+    public function regions(array $filters, int $limit, string $sortBy = 'campaigns', string $sortOrder = 'desc'): array
     {
-        return $this->repository->aggregateRegions($filters, $limit);
+        return $this->repository->aggregateRegions($filters, $limit, $sortBy, $sortOrder);
     }
 
-    public function media(array $filters, int $limit): array
+    public function media(array $filters, int $limit, string $sortBy = 'campaigns', string $sortOrder = 'desc'): array
     {
-        return $this->repository->aggregateMedia($filters, $limit);
+        return $this->repository->aggregateMedia($filters, $limit, $sortBy, $sortOrder);
     }
 
-    public function timeline(array $filters, string $groupBy, string $dimension): array
+    public function timeline(
+        array $filters,
+        string $groupBy,
+        string $dimension,
+        string $sortBy = 'period',
+        string $sortOrder = 'asc'
+    ): array
     {
-        return $this->repository->timeline($filters, $groupBy, $dimension);
+        return $this->repository->timeline($filters, $groupBy, $dimension, $sortBy, $sortOrder);
     }
 }

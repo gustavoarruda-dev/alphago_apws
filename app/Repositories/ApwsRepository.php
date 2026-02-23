@@ -222,28 +222,50 @@ class ApwsRepository
         ];
     }
 
-    public function aggregateBrands(array $filters, int $limit = 20): array
+    public function aggregateBrands(
+        array $filters,
+        int $limit = 20,
+        string $sortBy = 'campaigns',
+        string $sortOrder = 'desc'
+    ): array
     {
         return $this->aggregateManyToMany(
             $filters,
             'apws_creative_advertisers',
             'advertiser',
-            $limit
+            $limit,
+            $sortBy,
+            $sortOrder
         );
     }
 
-    public function aggregateProducts(array $filters, int $limit = 20): array
+    public function aggregateProducts(
+        array $filters,
+        int $limit = 20,
+        string $sortBy = 'campaigns',
+        string $sortOrder = 'desc'
+    ): array
     {
         return $this->aggregateManyToMany(
             $filters,
             'apws_creative_products',
             'product',
-            $limit
+            $limit,
+            $sortBy,
+            $sortOrder
         );
     }
 
-    public function aggregateMedia(array $filters, int $limit = 20): array
+    public function aggregateMedia(
+        array $filters,
+        int $limit = 20,
+        string $sortBy = 'campaigns',
+        string $sortOrder = 'desc'
+    ): array
     {
+        $safeSortBy = $this->sanitizeAggregateSortBy($sortBy);
+        $safeSortOrder = $this->sanitizeSortOrder($sortOrder, 'desc');
+
         $rows = $this->baseCreativeQuery($filters)
             ->leftJoin('apws_placements as pl', function ($join): void {
                 $join
@@ -254,7 +276,8 @@ class ApwsRepository
             ->selectRaw('COUNT(DISTINCT apws_creatives.id) as campaigns')
             ->selectRaw('COUNT(DISTINCT pl.id) as placements')
             ->groupByRaw("COALESCE(apws_creatives.media_type, 'N/D')")
-            ->orderByDesc('campaigns')
+            ->orderBy($safeSortBy, $safeSortOrder)
+            ->orderBy('label')
             ->limit($limit)
             ->get();
 
@@ -265,8 +288,16 @@ class ApwsRepository
         ])->all();
     }
 
-    public function aggregateRegions(array $filters, int $limit = 20): array
+    public function aggregateRegions(
+        array $filters,
+        int $limit = 20,
+        string $sortBy = 'campaigns',
+        string $sortOrder = 'desc'
+    ): array
     {
+        $safeSortBy = $this->sanitizeAggregateSortBy($sortBy);
+        $safeSortOrder = $this->sanitizeSortOrder($sortOrder, 'desc');
+
         $stateRows = $this->baseCreativeQuery($filters)
             ->leftJoin('apws_placements as pl', function ($join): void {
                 $join
@@ -307,13 +338,23 @@ class ApwsRepository
             return $item;
         }, $byMacro));
 
-        usort($rows, static fn (array $a, array $b): int => $b['campaigns'] <=> $a['campaigns']);
+        usort($rows, function (array $a, array $b) use ($safeSortBy, $safeSortOrder): int {
+            return $this->compareRegionRows($a, $b, $safeSortBy, $safeSortOrder);
+        });
 
         return array_slice($rows, 0, $limit);
     }
 
-    public function timeline(array $filters, string $groupBy, string $dimension): array
+    public function timeline(
+        array $filters,
+        string $groupBy,
+        string $dimension,
+        string $sortBy = 'period',
+        string $sortOrder = 'asc'
+    ): array
     {
+        $safeSortBy = $this->sanitizeTimelineSortBy($sortBy);
+        $safeSortOrder = $this->sanitizeSortOrder($sortOrder, 'asc');
         $format = $groupBy === 'day' ? 'Y-m-d' : 'Y-m';
 
         $query = $this->timelineQueryByDimension($filters, $dimension)
@@ -350,13 +391,19 @@ class ApwsRepository
             }
 
             usort($items, static fn (array $a, array $b): int => $b['campaigns'] <=> $a['campaigns']);
+            $topLabel = (string) ($items[0]['label'] ?? 'N/D');
 
             $result[] = [
                 'period' => $period,
                 'items' => $items,
                 'total_campaigns' => array_sum(array_map(static fn (array $row) => $row['campaigns'], $items)),
+                'top_label' => $topLabel,
             ];
         }
+
+        usort($result, function (array $a, array $b) use ($safeSortBy, $safeSortOrder): int {
+            return $this->compareTimelineRows($a, $b, $safeSortBy, $safeSortOrder);
+        });
 
         return $result;
     }
@@ -677,8 +724,18 @@ class ApwsRepository
         };
     }
 
-    private function aggregateManyToMany(array $filters, string $table, string $column, int $limit): array
+    private function aggregateManyToMany(
+        array $filters,
+        string $table,
+        string $column,
+        int $limit,
+        string $sortBy = 'campaigns',
+        string $sortOrder = 'desc'
+    ): array
     {
+        $safeSortBy = $this->sanitizeAggregateSortBy($sortBy);
+        $safeSortOrder = $this->sanitizeSortOrder($sortOrder, 'desc');
+
         $rows = $this->baseCreativeQuery($filters)
             ->join("{$table} as x", 'x.creative_id', '=', 'apws_creatives.id')
             ->leftJoin('apws_placements as pl', function ($join): void {
@@ -690,7 +747,8 @@ class ApwsRepository
             ->selectRaw('COUNT(DISTINCT apws_creatives.id) as campaigns')
             ->selectRaw('COUNT(DISTINCT pl.id) as placements')
             ->groupByRaw("x.{$column}")
-            ->orderByDesc('campaigns')
+            ->orderBy($safeSortBy, $safeSortOrder)
+            ->orderBy('label')
             ->limit($limit)
             ->get();
 
@@ -699,6 +757,100 @@ class ApwsRepository
             'campaigns' => (int) $row->campaigns,
             'placements' => (int) $row->placements,
         ])->all();
+    }
+
+    private function sanitizeAggregateSortBy(string $sortBy): string
+    {
+        $normalized = strtolower(trim($sortBy));
+
+        return in_array($normalized, ['label', 'campaigns', 'placements'], true)
+            ? $normalized
+            : 'campaigns';
+    }
+
+    private function sanitizeTimelineSortBy(string $sortBy): string
+    {
+        $normalized = strtolower(trim($sortBy));
+
+        return in_array($normalized, ['period', 'total_campaigns', 'top_label'], true)
+            ? $normalized
+            : 'period';
+    }
+
+    private function sanitizeSortOrder(string $sortOrder, string $default = 'desc'): string
+    {
+        $normalized = strtolower(trim($sortOrder));
+
+        if (in_array($normalized, ['asc', 'desc'], true)) {
+            return $normalized;
+        }
+
+        return strtolower($default) === 'asc' ? 'asc' : 'desc';
+    }
+
+    private function compareRegionRows(array $a, array $b, string $sortBy, string $sortOrder): int
+    {
+        $direction = $sortOrder === 'asc' ? 1 : -1;
+
+        if ($sortBy === 'label') {
+            $labelCompare = $this->compareStrings((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
+            if ($labelCompare !== 0) {
+                return $labelCompare * $direction;
+            }
+
+            return ((int) ($a['campaigns'] ?? 0) <=> (int) ($b['campaigns'] ?? 0)) * -1;
+        }
+
+        if ($sortBy === 'placements') {
+            $placementCompare = ((int) ($a['placements'] ?? 0) <=> (int) ($b['placements'] ?? 0)) * $direction;
+            if ($placementCompare !== 0) {
+                return $placementCompare;
+            }
+
+            return $this->compareStrings((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
+        }
+
+        $campaignCompare = ((int) ($a['campaigns'] ?? 0) <=> (int) ($b['campaigns'] ?? 0)) * $direction;
+        if ($campaignCompare !== 0) {
+            return $campaignCompare;
+        }
+
+        return $this->compareStrings((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
+    }
+
+    private function compareTimelineRows(array $a, array $b, string $sortBy, string $sortOrder): int
+    {
+        $direction = $sortOrder === 'asc' ? 1 : -1;
+
+        if ($sortBy === 'period') {
+            $periodCompare = $this->compareStrings((string) ($a['period'] ?? ''), (string) ($b['period'] ?? ''));
+            if ($periodCompare !== 0) {
+                return $periodCompare * $direction;
+            }
+
+            return ((int) ($a['total_campaigns'] ?? 0) <=> (int) ($b['total_campaigns'] ?? 0)) * -1;
+        }
+
+        if ($sortBy === 'top_label') {
+            $labelCompare = $this->compareStrings((string) ($a['top_label'] ?? ''), (string) ($b['top_label'] ?? ''));
+            if ($labelCompare !== 0) {
+                return $labelCompare * $direction;
+            }
+
+            return $this->compareStrings((string) ($a['period'] ?? ''), (string) ($b['period'] ?? ''));
+        }
+
+        $campaignCompare = ((int) ($a['total_campaigns'] ?? 0) <=> (int) ($b['total_campaigns'] ?? 0)) * $direction;
+        if ($campaignCompare !== 0) {
+            return $campaignCompare;
+        }
+
+        return $this->compareStrings((string) ($a['period'] ?? ''), (string) ($b['period'] ?? ''));
+    }
+
+    private function compareStrings(string $left, string $right): int
+    {
+        return strcasecmp($left, $right);
     }
 
     /**

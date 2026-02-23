@@ -23,7 +23,12 @@ class AnalyticsController extends Controller
     public function brands(AnalyticsRequest $request): JsonResponse
     {
         return $this->success(
-            $this->service->brands($request->filters(), $request->limit()),
+            $this->service->brands(
+                $request->filters(),
+                $request->limit(),
+                $request->sortBy('campaigns'),
+                $request->sortOrder('desc')
+            ),
             'Brand analytics'
         );
     }
@@ -31,7 +36,12 @@ class AnalyticsController extends Controller
     public function products(AnalyticsRequest $request): JsonResponse
     {
         return $this->success(
-            $this->service->products($request->filters(), $request->limit()),
+            $this->service->products(
+                $request->filters(),
+                $request->limit(),
+                $request->sortBy('campaigns'),
+                $request->sortOrder('desc')
+            ),
             'Product analytics'
         );
     }
@@ -39,7 +49,12 @@ class AnalyticsController extends Controller
     public function regions(AnalyticsRequest $request): JsonResponse
     {
         return $this->success(
-            $this->service->regions($request->filters(), $request->limit()),
+            $this->service->regions(
+                $request->filters(),
+                $request->limit(),
+                $request->sortBy('campaigns'),
+                $request->sortOrder('desc')
+            ),
             'Region analytics'
         );
     }
@@ -47,7 +62,12 @@ class AnalyticsController extends Controller
     public function media(AnalyticsRequest $request): JsonResponse
     {
         return $this->success(
-            $this->service->media($request->filters(), $request->limit()),
+            $this->service->media(
+                $request->filters(),
+                $request->limit(),
+                $request->sortBy('campaigns'),
+                $request->sortOrder('desc')
+            ),
             'Media analytics'
         );
     }
@@ -55,7 +75,13 @@ class AnalyticsController extends Controller
     public function timeline(AnalyticsRequest $request): JsonResponse
     {
         return $this->success(
-            $this->service->timeline($request->filters(), $request->groupBy(), $request->dimension()),
+            $this->service->timeline(
+                $request->filters(),
+                $request->groupBy(),
+                $request->dimension(),
+                $request->sortBy('period'),
+                $request->sortOrder('asc')
+            ),
             'Timeline analytics'
         );
     }
