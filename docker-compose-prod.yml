@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: apws-app
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "8004:8000"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      CACHE_STORE: file
+      CACHE_DRIVER: file
+      APWS_PROVIDER_BASE_URL: "${APWS_PROVIDER_BASE_URL:-https://arquivo.net/apws/}"
+      APWS_PROVIDER_TIMEOUT: "${APWS_PROVIDER_TIMEOUT:-60}"
+      APWS_API_KEY: "${APWS_API_KEY}"
+      APWS_SYNC_ENABLED: "${APWS_SYNC_ENABLED:-true}"
+      APWS_SYNC_TEST: "${APWS_SYNC_TEST:-false}"
+      APWS_SYNC_TIMEZONE: "${APWS_SYNC_TIMEZONE:-America/Sao_Paulo}"
+      APWS_SYNC_BUSINESS_START: "${APWS_SYNC_BUSINESS_START:-08:00}"
+      APWS_SYNC_BUSINESS_END: "${APWS_SYNC_BUSINESS_END:-19:00}"
+    restart: always
+    command: sh -lc "php -S 0.0.0.0:8000 -t public public/index.php"
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: apws-scheduler
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      CACHE_STORE: file
+      CACHE_DRIVER: file
+      APWS_PROVIDER_BASE_URL: "${APWS_PROVIDER_BASE_URL:-https://arquivo.net/apws/}"
+      APWS_PROVIDER_TIMEOUT: "${APWS_PROVIDER_TIMEOUT:-60}"
+      APWS_API_KEY: "${APWS_API_KEY}"
+      APWS_SYNC_ENABLED: "${APWS_SYNC_ENABLED:-true}"
+      APWS_SYNC_TEST: "${APWS_SYNC_TEST:-false}"
+      APWS_SYNC_TIMEZONE: "${APWS_SYNC_TIMEZONE:-America/Sao_Paulo}"
+      APWS_SYNC_BUSINESS_START: "${APWS_SYNC_BUSINESS_START:-08:00}"
+      APWS_SYNC_BUSINESS_END: "${APWS_SYNC_BUSINESS_END:-19:00}"
+    depends_on:
+      - app
+    restart: always
+    command: sh -lc "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"

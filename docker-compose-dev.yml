@@ -1,0 +1,66 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: apws-app
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "8004:8000"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      CACHE_STORE: file
+      CACHE_DRIVER: file
+      DB_CONNECTION: pgsql
+      DB_HOST: host.docker.internal
+      DB_PORT: 5442
+      DB_DATABASE: apws_service
+      DB_USERNAME: laravel
+      DB_PASSWORD: secret
+      APWS_PROVIDER_BASE_URL: "${APWS_PROVIDER_BASE_URL:-https://arquivo.net/apws/}"
+      APWS_PROVIDER_TIMEOUT: "${APWS_PROVIDER_TIMEOUT:-60}"
+      APWS_API_KEY: "${APWS_API_KEY:-8eec7a4d-e587-4989-bb07-9313b7f21ff8}"
+      APWS_SYNC_ENABLED: "${APWS_SYNC_ENABLED:-true}"
+      APWS_SYNC_TEST: "${APWS_SYNC_TEST:-false}"
+      APWS_SYNC_TIMEZONE: "${APWS_SYNC_TIMEZONE:-America/Sao_Paulo}"
+      APWS_SYNC_BUSINESS_START: "${APWS_SYNC_BUSINESS_START:-08:00}"
+      APWS_SYNC_BUSINESS_END: "${APWS_SYNC_BUSINESS_END:-19:00}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: sh -lc "composer install --no-interaction --prefer-dist && php artisan migrate --force && php -S 0.0.0.0:8000 -t public public/index.php"
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: apws-scheduler
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      CACHE_STORE: file
+      CACHE_DRIVER: file
+      DB_CONNECTION: pgsql
+      DB_HOST: host.docker.internal
+      DB_PORT: 5442
+      DB_DATABASE: apws_service
+      DB_USERNAME: laravel
+      DB_PASSWORD: secret
+      APWS_PROVIDER_BASE_URL: "${APWS_PROVIDER_BASE_URL:-https://arquivo.net/apws/}"
+      APWS_PROVIDER_TIMEOUT: "${APWS_PROVIDER_TIMEOUT:-60}"
+      APWS_API_KEY: "${APWS_API_KEY:-8eec7a4d-e587-4989-bb07-9313b7f21ff8}"
+      APWS_SYNC_ENABLED: "${APWS_SYNC_ENABLED:-true}"
+      APWS_SYNC_TEST: "${APWS_SYNC_TEST:-false}"
+      APWS_SYNC_TIMEZONE: "${APWS_SYNC_TIMEZONE:-America/Sao_Paulo}"
+      APWS_SYNC_BUSINESS_START: "${APWS_SYNC_BUSINESS_START:-08:00}"
+      APWS_SYNC_BUSINESS_END: "${APWS_SYNC_BUSINESS_END:-19:00}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - app
+    command: sh -lc "composer install --no-interaction --prefer-dist && while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
