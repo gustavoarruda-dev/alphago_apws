@@ -407,6 +407,7 @@ class ApwsRepository
         ksort($bucket);
 
         $result = [];
+        $previousTotalCampaigns = null;
         foreach ($bucket as $period => $labels) {
             $items = [];
             foreach ($labels as $label => $creativeSet) {
@@ -418,13 +419,20 @@ class ApwsRepository
 
             usort($items, static fn (array $a, array $b): int => $b['campaigns'] <=> $a['campaigns']);
             $topLabel = (string) ($items[0]['label'] ?? 'N/D');
+            $totalCampaigns = array_sum(array_map(static fn (array $row) => $row['campaigns'], $items));
+            $variation = null;
+            if ($previousTotalCampaigns !== null && $previousTotalCampaigns > 0) {
+                $variation = (int) round((($totalCampaigns - $previousTotalCampaigns) / $previousTotalCampaigns) * 100);
+            }
 
             $result[] = [
                 'period' => $period,
                 'items' => $items,
-                'total_campaigns' => array_sum(array_map(static fn (array $row) => $row['campaigns'], $items)),
+                'total_campaigns' => $totalCampaigns,
                 'top_label' => $topLabel,
+                'variation' => $variation,
             ];
+            $previousTotalCampaigns = $totalCampaigns;
         }
 
         usort($result, function (array $a, array $b) use ($safeSortBy, $safeSortOrder): int {
@@ -802,7 +810,7 @@ class ApwsRepository
     {
         $normalized = strtolower(trim($sortBy));
 
-        return in_array($normalized, ['period', 'total_campaigns', 'top_label'], true)
+        return in_array($normalized, ['period', 'total_campaigns', 'top_label', 'variation'], true)
             ? $normalized
             : 'period';
     }
@@ -865,6 +873,30 @@ class ApwsRepository
             $labelCompare = $this->compareStrings((string) ($a['top_label'] ?? ''), (string) ($b['top_label'] ?? ''));
             if ($labelCompare !== 0) {
                 return $labelCompare * $direction;
+            }
+
+            return $this->compareStrings((string) ($a['period'] ?? ''), (string) ($b['period'] ?? ''));
+        }
+
+        if ($sortBy === 'variation') {
+            $aVariation = is_numeric($a['variation'] ?? null) ? (int) $a['variation'] : null;
+            $bVariation = is_numeric($b['variation'] ?? null) ? (int) $b['variation'] : null;
+
+            if ($aVariation === null && $bVariation === null) {
+                return $this->compareStrings((string) ($a['period'] ?? ''), (string) ($b['period'] ?? ''));
+            }
+
+            if ($aVariation === null) {
+                return 1;
+            }
+
+            if ($bVariation === null) {
+                return -1;
+            }
+
+            $variationCompare = ($aVariation <=> $bVariation) * $direction;
+            if ($variationCompare !== 0) {
+                return $variationCompare;
             }
 
             return $this->compareStrings((string) ($a['period'] ?? ''), (string) ($b['period'] ?? ''));
