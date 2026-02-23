@@ -37,6 +37,14 @@ return [
         'retry_sleep_ms' => (int) env('APWS_PROVIDER_RETRY_SLEEP_MS', 2000),
         'api_key' => env('APWS_API_KEY', env('X_API_KEY')),
         'gateway_api_key' => env('APWS_API_KEY', env('X_API_KEY')),
+        'media_storage' => [
+            'enabled' => filter_var(env('APWS_MEDIA_STORAGE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+            'disk' => env('APWS_MEDIA_STORAGE_DISK', 'public'),
+            'timeout' => (int) env('APWS_MEDIA_STORAGE_TIMEOUT', 90),
+            'retries' => (int) env('APWS_MEDIA_STORAGE_RETRIES', 2),
+            'retry_sleep_ms' => (int) env('APWS_MEDIA_STORAGE_RETRY_SLEEP_MS', 1500),
+            'max_bytes' => (int) env('APWS_MEDIA_STORAGE_MAX_BYTES', 157286400),
+        ],
         'sync' => [
             'enabled' => filter_var(env('APWS_SYNC_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
             'test_mode' => filter_var(env('APWS_SYNC_TEST', false), FILTER_VALIDATE_BOOLEAN),

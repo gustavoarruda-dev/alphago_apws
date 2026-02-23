@@ -3,6 +3,7 @@
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\FilterController;
+use App\Http\Controllers\MediaController;
 use App\Http\Controllers\StatusController;
 use App\Http\Controllers\SyncController;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +30,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/campaigns', [CampaignController::class, 'index']);
         Route::get('/campaigns/{creativeCode}', [CampaignController::class, 'show']);
+        Route::get('/media/{creativeCode}', [MediaController::class, 'show']);
 
         Route::prefix('analytics')->group(function () {
             Route::get('/summary', [AnalyticsController::class, 'summary']);

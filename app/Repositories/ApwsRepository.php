@@ -91,7 +91,22 @@ class ApwsRepository
         );
     }
 
-    public function upsertCreative(string $customerUuid, array $payload, bool $persistRaw = true): ApwsCreative
+    /**
+     * @param array{
+     *   stored_media_disk: string,
+     *   stored_media_path: string,
+     *   stored_media_source_url: string,
+     *   stored_media_mime: string|null,
+     *   stored_media_size: int,
+     *   stored_media_downloaded_at: string
+     * }|null $mediaMeta
+     */
+    public function upsertCreative(
+        string $customerUuid,
+        array $payload,
+        bool $persistRaw = true,
+        ?array $mediaMeta = null
+    ): ApwsCreative
     {
         $creativeCode = trim((string) ($payload['criativo'] ?? ''));
         if ($creativeCode === '') {
@@ -106,9 +121,7 @@ class ApwsRepository
             ? strtolower((string) pathinfo($download, PATHINFO_EXTENSION))
             : null;
 
-        $creative = ApwsCreative::query()->updateOrCreate(
-            ['customer_uuid' => $customerUuid, 'creative_code' => $creativeCode],
-            [
+        $updateData = [
                 'customer_uuid' => $customerUuid,
                 'campaign_code' => $this->nullableString($payload['campanha'] ?? null),
                 'media_type' => $this->nullableString($payload['midia'] ?? null),
@@ -118,7 +131,20 @@ class ApwsRepository
                 'collect_vehicle' => $this->nullableString($coleta['veiculo'] ?? null),
                 'primary_file_type' => $primaryFileType,
                 'raw_payload' => $persistRaw ? $payload : null,
-            ]
+        ];
+
+        if ($mediaMeta !== null) {
+            $updateData['stored_media_disk'] = $this->nullableString($mediaMeta['stored_media_disk'] ?? null);
+            $updateData['stored_media_path'] = $this->nullableString($mediaMeta['stored_media_path'] ?? null);
+            $updateData['stored_media_source_url'] = $this->nullableString($mediaMeta['stored_media_source_url'] ?? null);
+            $updateData['stored_media_mime'] = $this->nullableString($mediaMeta['stored_media_mime'] ?? null);
+            $updateData['stored_media_size'] = max(0, (int) ($mediaMeta['stored_media_size'] ?? 0));
+            $updateData['stored_media_downloaded_at'] = $this->parseDateTime((string) ($mediaMeta['stored_media_downloaded_at'] ?? ''));
+        }
+
+        $creative = ApwsCreative::query()->updateOrCreate(
+            ['customer_uuid' => $customerUuid, 'creative_code' => $creativeCode],
+            $updateData
         );
 
         $this->syncAdvertisers($creative->id, (array) ($payload['anunciantes'] ?? []));
@@ -552,7 +578,11 @@ class ApwsRepository
             }
         }
 
-        return null;
+        try {
+            return Carbon::parse($value)->toDateTimeString();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function nullableString(mixed $value): ?string

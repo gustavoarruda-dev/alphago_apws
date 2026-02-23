@@ -18,6 +18,9 @@ class ApwsCreativeResource extends JsonResource
             'collect_state' => $this->collect_state,
             'collect_vehicle' => $this->collect_vehicle,
             'primary_file_type' => $this->primary_file_type,
+            'has_stored_media' => $this->stored_media_path !== null && trim((string) $this->stored_media_path) !== '',
+            'stored_media_mime' => $this->stored_media_mime,
+            'stored_media_size' => $this->stored_media_size !== null ? (int) $this->stored_media_size : null,
             'advertisers' => $this->whenLoaded('advertisers', function () {
                 return $this->advertisers->pluck('advertiser')->values()->all();
             }, []),

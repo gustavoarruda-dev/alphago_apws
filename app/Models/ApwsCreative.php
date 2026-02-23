@@ -19,11 +19,18 @@ class ApwsCreative extends Model
         'collect_state',
         'collect_vehicle',
         'primary_file_type',
+        'stored_media_disk',
+        'stored_media_path',
+        'stored_media_source_url',
+        'stored_media_mime',
+        'stored_media_size',
+        'stored_media_downloaded_at',
         'raw_payload',
     ];
 
     protected $casts = [
         'collect_date' => 'date',
+        'stored_media_downloaded_at' => 'datetime',
         'raw_payload' => 'array',
     ];
 

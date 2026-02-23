@@ -11,6 +11,7 @@ class ApwsSyncService
     public function __construct(
         private readonly ApwsApiClient $client,
         private readonly ApwsRepository $repository,
+        private readonly ApwsMediaStorageService $mediaStorageService,
     ) {
     }
 
@@ -31,11 +32,33 @@ class ApwsSyncService
                 $status = 'failed';
             }
 
-            $run = DB::transaction(function () use ($payload, $mensagens, $httpStatus, $status, $providerMessage, $persistRaw, $startedAt, $t1, $t2, $customerUuid): ApwsSyncRun {
-                foreach ((array) ($payload['criativos'] ?? []) as $creative) {
-                    if (is_array($creative)) {
-                        $this->repository->upsertCreative($customerUuid, $creative, $persistRaw);
-                    }
+            $preparedCreatives = [];
+            foreach ((array) ($payload['criativos'] ?? []) as $creative) {
+                if (!is_array($creative)) {
+                    continue;
+                }
+
+                $mediaMeta = null;
+                try {
+                    $mediaMeta = $this->mediaStorageService->resolveAndStore($customerUuid, $creative);
+                } catch (\Throwable) {
+                    // Media persistence is best-effort and must not block metadata sync.
+                }
+
+                $preparedCreatives[] = [
+                    'payload' => $creative,
+                    'media_meta' => $mediaMeta,
+                ];
+            }
+
+            $run = DB::transaction(function () use ($preparedCreatives, $payload, $mensagens, $httpStatus, $status, $providerMessage, $persistRaw, $startedAt, $t1, $t2, $customerUuid): ApwsSyncRun {
+                foreach ($preparedCreatives as $entry) {
+                    $this->repository->upsertCreative(
+                        $customerUuid,
+                        (array) ($entry['payload'] ?? []),
+                        $persistRaw,
+                        is_array($entry['media_meta'] ?? null) ? $entry['media_meta'] : null
+                    );
                 }
 
                 foreach ((array) ($payload['veiculacoes'] ?? []) as $placement) {
